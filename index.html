@@ -3,345 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pithos | Smart Auditor</title>
+    <title>Pithos | AI Protocol</title>
     
-    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
-    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-
+    <!-- Font & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        :root { --bg: #000; --fg: #eee; --dim: #666; --border: 1px solid #444; --accent: #00ff41; }
+        :root { --bg: #000; --fg: #fff; --dim: #666; --border: 1px solid #fff; --accent: #00ff41; }
         * { box-sizing: border-box; }
-        body { margin: 0; background: var(--bg); color: var(--fg); font-family: 'JetBrains Mono', monospace; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        body { margin: 0; background: var(--bg); color: var(--fg); font-family: 'JetBrains Mono', monospace; padding: 20px; }
 
-        header { padding: 10px 20px; border-bottom: var(--border); display: flex; justify-content: space-between; align-items: center; background: #111; z-index: 10; }
-        h1 { margin: 0; font-size: 1.1rem; letter-spacing: 1px; }
-
-        #workspace { flex: 1; display: flex; overflow: hidden; position: relative; }
-
-        /* SMART VIEWER */
-        #doc-view { 
-            flex: 1; padding: 20px; overflow-y: auto; border-right: var(--border); 
-            font-size: 0.85rem; line-height: 1.8; color: #aaa; 
-            background: #050505;
-        }
-
-        /* Structured Lines */
-        .line-item { 
-            border-bottom: 1px dotted #222; padding: 2px 0; display: flex; flex-wrap: wrap; align-items: baseline;
-        }
-        .line-item:hover { background: #111; }
+        .container { max-width: 600px; margin: 0 auto; }
         
-        /* Highlights */
-        .hl-money { 
-            color: #ffd700; cursor: pointer; font-weight: bold; border-bottom: 1px solid #ffd700; margin: 0 2px;
-            background: rgba(255, 215, 0, 0.05); padding: 0 2px;
-        }
-        .hl-money:hover { background: #ffd700; color: #000; }
+        header { text-align: center; border-bottom: var(--border); padding-bottom: 20px; margin-bottom: 30px; }
+        h1 { margin: 0; font-size: 1.5rem; letter-spacing: 2px; }
         
-        .hl-user { 
-            color: #00ffff; cursor: pointer; font-weight: bold; border-bottom: 1px solid #00ffff; margin: 0 2px;
-            background: rgba(0, 255, 255, 0.05); padding: 0 2px;
+        .card { border: var(--border); padding: 20px; margin-bottom: 20px; background: #111; }
+        label { display: block; color: var(--dim); font-size: 0.8rem; margin-bottom: 5px; }
+        input { 
+            width: 100%; background: #000; border: 1px solid #444; color: #fff; 
+            padding: 10px; font-family: inherit; font-size: 1rem; outline: none;
         }
-        .hl-user:hover { background: #00ffff; color: #000; }
+        input:focus { border-color: var(--accent); }
 
-        .context-kw { color: #fff; font-weight: bold; }
-
-        /* CONTROLS */
-        #audit-panel { width: 350px; background: #0a0a0a; display: flex; flex-direction: column; border-left: var(--border); }
-        .panel-content { flex: 1; padding: 20px; overflow-y: auto; }
-        
-        .card { border: var(--border); padding: 15px; margin-bottom: 15px; background: #111; border-radius: 6px; }
-        .label { font-size: 0.7rem; color: #888; display: block; margin-bottom: 5px; text-transform: uppercase; }
-        .val-display { font-size: 1.3rem; font-weight: bold; color: #fff; border-bottom: 1px solid #444; padding-bottom: 5px; }
-        .ev-text { font-size: 0.7rem; color: #666; margin-top: 5px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-        .btn-action { width: 100%; padding: 12px; background: #222; color: #fff; border: 1px solid #666; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.2s; }
-        .btn-action:hover { background: #fff; color: #000; }
-
-        /* VERDICT */
-        .verdict-box { text-align: center; padding: 15px; margin-top: 10px; border: 1px solid #333; border-radius: 6px; }
-        .scam { color: #ff0055; border-color: #ff0055; background: rgba(255, 0, 85, 0.1); }
-        .safe { color: var(--accent); border-color: var(--accent); background: rgba(0, 255, 65, 0.1); }
-
-        /* OVERLAY */
-        #drop-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.92); z-index: 20; display: flex;
-            flex-direction: column; align-items: center; justify-content: center;
+        /* PROMPT BOX */
+        .prompt-box {
+            position: relative;
+            background: #0a0a0a; border: 1px dashed var(--dim);
+            padding: 15px; font-size: 0.7rem; color: #aaa;
+            height: 300px; overflow-y: auto; white-space: pre-wrap;
+            margin-bottom: 20px;
         }
-        .btn-upload {
-            background: var(--accent); color: #000; border: none; padding: 15px 40px;
-            font-weight: bold; font-size: 1.2rem; cursor: pointer; border-radius: 50px; margin-top: 20px;
-            box-shadow: 0 0 20px rgba(0,255,65,0.4);
-        }
-        #loading { display: none; color: var(--accent); position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index: 30; text-align: center; background:#000; padding:20px; border:1px solid var(--accent); }
 
-        @media (max-width: 768px) {
-            #workspace { flex-direction: column; }
-            #doc-view { height: 50%; border-right: none; border-bottom: var(--border); }
-            #audit-panel { height: 50%; width: 100%; border-left: none; }
+        .btn {
+            width: 100%; padding: 15px; background: var(--accent); color: #000;
+            border: none; font-weight: bold; cursor: pointer; font-size: 1rem;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
         }
+        .btn:active { transform: scale(0.98); }
+
+        .step { margin-bottom: 10px; font-size: 0.9rem; }
+        .step i { color: var(--accent); width: 20px; }
     </style>
 </head>
-<body oncontextmenu="return false;">
+<body>
 
-    <header>
-        <div style="display:flex; align-items:center; gap:10px;">
-            <i class="fas fa-robot" style="color:var(--accent);"></i>
-            <h1>SMART AUDITOR</h1>
-        </div>
-        <div style="font-size:0.7rem; color:#666;">LAYOUT RECONSTRUCTION: ON</div>
-    </header>
+    <div class="container">
+        <header>
+            <i class="fas fa-robot" style="font-size: 2rem; color: var(--accent); margin-bottom: 10px;"></i>
+            <h1>AI AUDIT PROTOCOL</h1>
+            <div style="font-size: 0.7rem; color: #888;">GENERATE SBCM PROMPT</div>
+        </header>
 
-    <div id="workspace">
-        <div id="doc-view">
-            <div style="text-align:center; color:#444; margin-top:50px;">
-                // SMART VIEWER //<br>
-                Drag & Drop PDF to start layout analysis.
-            </div>
-        </div>
-
-        <div id="audit-panel">
-            <div class="panel-content">
-                <div class="card">
-                    <span class="label">TARGET</span>
-                    <input type="text" id="doc-name" placeholder="..." disabled style="width:100%; background:transparent; border:none; color:#888;">
-                </div>
-                
-                <div class="card" style="border-left: 3px solid #ffd700;">
-                    <span class="label">1. BUDGET (予算)</span>
-                    <div id="disp-budget" class="val-display">0</div>
-                    <div id="ev-budget" class="ev-text">...</div>
-                </div>
-
-                <div class="card" style="border-left: 3px solid #00ffff;">
-                    <span class="label">2. USERS (人数)</span>
-                    <div id="disp-user" class="val-display">0</div>
-                    <div id="ev-user" class="ev-text">...</div>
-                </div>
-
-                <div id="verdict-area" class="verdict-box" style="display:none;">
-                    <div style="font-size:0.7rem; margin-bottom:5px;">DISTORTION INDEX</div>
-                    <div id="d-val" style="font-size:3rem; font-weight:bold; line-height:1;">0.0</div>
-                    <div id="d-res" style="font-weight:bold; letter-spacing:2px; margin-top:5px;">---</div>
-                </div>
-            </div>
+        <!-- CONFIG -->
+        <div class="card">
+            <label>TARGET CITY (自治体名)</label>
+            <input type="text" id="city" placeholder="例: 柏市" oninput="updatePrompt()">
             
-            <div style="padding:20px; border-top:var(--border);">
-                <button class="btn-action" py-click="export_report">DOWNLOAD REPORT</button>
-                <button class="btn-action" onclick="location.reload()" style="background:transparent; border-color:#444; color:#666;">RESET</button>
-            </div>
+            <label style="margin-top:15px;">POPULATION (人口 / 概算)</label>
+            <input type="number" id="pop" placeholder="例: 430000" oninput="updatePrompt()">
         </div>
 
-        <div id="drop-overlay">
-            <i class="fas fa-file-invoice-dollar" style="font-size:4rem; color:#444;"></i>
-            <h2 style="margin-top:20px; color:#ccc;">DROP PDF</h2>
-            <button id="btn-select" class="btn-upload" onclick="document.getElementById('file-in').click()">OPEN FILE</button>
-            <input type="file" id="file-in" style="display:none;" accept="application/pdf">
+        <!-- GENERATED PROMPT -->
+        <div class="prompt-box" id="prompt-area">
+            <!-- Text injected via JS -->
         </div>
-        <div id="loading">
-            <i class="fas fa-microchip fa-spin"></i><br><br>RECONSTRUCTING LAYOUT...
+
+        <button class="btn" onclick="copyPrompt()">
+            <i class="fas fa-copy"></i> COPY PROTOCOL
+        </button>
+        
+        <div style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
+            <div style="font-weight:bold; margin-bottom:10px;">使い方:</div>
+            <div class="step"><i class="fas fa-check"></i> 1. 上記のボタンでプロンプトをコピーする</div>
+            <div class="step"><i class="fas fa-check"></i> 2. ChatGPT / Gemini / Claude を開く</div>
+            <div class="step"><i class="fas fa-check"></i> 3. 決算書PDFをアップロードし、プロンプトを貼り付けて送信</div>
         </div>
     </div>
 
-    <!-- JS: Smart PDF Layout Parser -->
     <script>
-        const fileIn = document.getElementById('file-in');
-        fileIn.onchange = (e) => { if (e.target.files[0]) loadPDF(e.target.files[0]); };
+        function updatePrompt() {
+            const city = document.getElementById('city').value || "対象自治体";
+            const pop = document.getElementById('pop').value || "不明";
+            
+            const text = `あなたは「冷徹な行政経営コンサルタント」です。
+添付された決算書・事業報告書に基づき、以下の「SBCM（標準ブロック比較法）」を用いて、事業の歪みを監査してください。
 
-        async function loadPDF(file) {
-            document.getElementById('doc-name').value = file.name;
-            document.getElementById('drop-overlay').style.display = 'none';
-            document.getElementById('loading').style.display = 'block';
+## 1. 監査対象プロファイル
+*   **自治体名:** ${city}
+*   **人口:** ${pop} 人
+*   **標準ブロック係数 (S_factor):** ${pop} / 72176 (標準自治体人口)
 
-            try {
-                const buffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument(buffer).promise;
-                let textLines = [];
-                const max = Math.min(pdf.numPages, 30);
-                
-                for (let i = 1; i <= max; i++) {
-                    const page = await pdf.getPage(i);
-                    const content = await page.getTextContent();
-                    
-                    // --- LAYOUT RECONSTRUCTION ENGINE ---
-                    // 1. Group items by Y coordinate (Tolerance: 5px)
-                    const yGroup = {};
-                    content.items.forEach(item => {
-                        const y = Math.round(item.transform[5] / 5) * 5; // Quantize Y
-                        if (!yGroup[y]) yGroup[y] = [];
-                        yGroup[y].push(item);
-                    });
+## 2. 監査ロジック (SBCM)
+各事業について、以下の指標を計算し、テーブル形式で出力してください。
 
-                    // 2. Sort lines (Top to Bottom)
-                    const sortedYs = Object.keys(yGroup).sort((a, b) => b - a);
+1.  **予算インパクト (I_budget):**
+    *   式: 決算額 ÷ (3000万円 × S_factor)
+    *   意味: 自治体規模に対して、標準的な事業の何倍のコストか。
+2.  **普及インパクト (I_coverage):**
+    *   式: 推定利用者数 ÷ (72000人 × S_factor)
+    *   意味: 住民全体に対して、どれだけ普及しているか。
+3.  **歪み指数 (D_index):**
+    *   式: I_budget ÷ I_coverage
+    *   **判定基準:**
+        *   D < 1.0 : ✅ 高効率 (Excellent)
+        *   D > 10.0 : ⚠️ 歪み (Distortion)
+        *   D > 50.0 : 🚨 異常値 (SCAM)
 
-                    // 3. Join items in each line (Left to Right)
-                    sortedYs.forEach(y => {
-                        const lineItems = yGroup[y].sort((a, b) => a.transform[4] - b.transform[4]);
-                        const lineStr = lineItems.map(it => it.str).join(" "); // Add space between cols
-                        if (lineStr.trim()) textLines.push(lineStr);
-                    });
-                }
-                
-                const fullText = textLines.join("\n");
-                window.py_process_smart(fullText);
+## 3. 出力フォーマット
+以下のカラムを持つMarkdownテーブルを作成し、特に「D_index > 10」の事業を優先的にリストアップしてください。
 
-            } catch (e) {
-                alert("Parsing Error: " + e); location.reload();
-            }
+| 事業名 | 決算額 | 利用者数 | D_index | 判定 | 辛口コメント |
+|---|---|---|---|---|---|
+| ... | ... | ... | ... | ... | ... |
+
+※ 利用者数が不明な場合はフェルミ推定を行い、その根拠を明記すること。
+※ 感情を排し、数字に基づいて冷徹に評価すること。`;
+
+            document.getElementById('prompt-area').innerText = text;
         }
 
-        function downloadFile(filename, content) {
-            const blob = new Blob([content], { type: 'text/markdown' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = filename; a.click();
+        function copyPrompt() {
+            const text = document.getElementById('prompt-area').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector('.btn');
+                const original = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> COPIED!';
+                btn.style.background = "#fff";
+                setTimeout(() => { 
+                    btn.innerHTML = original; 
+                    btn.style.background = "var(--accent)";
+                }, 2000);
+            });
         }
-    </script>
 
-    <!-- PYTHON: Smart Filters -->
-    <script type="py">
-        from pyscript import document
-        from pyodide.ffi import create_proxy
-        import js, re
-        from datetime import datetime
-        
-        current_budget = 0
-        current_users = 0
-        ev_b = ""
-        ev_u = ""
-
-        # Filters
-        KW_CONTEXT = ["事業", "決算", "予算", "概要", "費", "金", "合計", "内訳", "報酬", "委託", "工事"]
-        
-        # Regex (Strict)
-        re_money = re.compile(r'([0-9,]+(兆|億|万|千)?円)')
-        re_ppl = re.compile(r'([0-9,]+(人|名|世帯|団体|件|回))') # Units expanded
-
-        def process_smart(raw_text):
-            lines = raw_text.split('\n')
-            html = ""
-            
-            def repl_m(m):
-                val = parse_jp_money(m.group(0))
-                # Filter: Ignore < 100,000 yen (dates, page nums)
-                if val < 100000: return m.group(0)
-                txt = m.group(0).replace("'", "")
-                return f'<span class="hl-money" onclick="window.set_budget({val}, \'{txt}\')">{m.group(0)}</span>'
-
-            def repl_p(m):
-                val = parse_num(m.group(0))
-                # Filter: Ignore 0 or huge outlier
-                if val == 0: return m.group(0)
-                txt = m.group(0).replace("'", "")
-                return f'<span class="hl-user" onclick="window.set_user({val}, \'{txt}\')">{m.group(0)}</span>'
-
-            for line in lines:
-                s_line = line.strip()
-                if not s_line: continue
-
-                # Noise Filter: Skip lines that look like just dates or page nums
-                if re.match(r'^[0-9\s/-]+$', s_line): continue 
-
-                # Process
-                proc = s_line
-                
-                # Bold Keywords
-                for k in KW_CONTEXT:
-                    if k in proc: proc = proc.replace(k, f"<span class='context-kw'>{k}</span>")
-
-                # Inject Handlers
-                proc = re_money.sub(repl_m, proc)
-                proc = re_ppl.sub(repl_p, proc)
-                
-                html += f"<div class='line-item'>{proc}</div>"
-
-            document.getElementById('doc-view').innerHTML = html
-            document.getElementById('loading').style.display = 'none'
-
-        def parse_jp_money(s):
-            s = s.replace(",","").replace("円","").strip()
-            unit = 1
-            if "兆" in s: unit=1000000000000; s=s.replace("兆","")
-            if "億" in s: unit=100000000; s=s.replace("億","")
-            if "万" in s: unit=10000; s=s.replace("万","")
-            try: return float(s) * unit
-            except: return 0
-
-        def parse_num(s):
-            # Strip non-numeric chars except ,
-            s = re.sub(r'[^0-9,]', '', s)
-            s = s.replace(",","")
-            try: return float(s)
-            except: return 0
-
-        def set_budget_py(val, txt):
-            global current_budget, ev_b
-            current_budget = val
-            ev_b = txt
-            document.getElementById('disp-budget').innerText = f"¥{int(val):,}"
-            document.getElementById('ev-budget').innerText = txt
-            calc()
-
-        def set_user_py(val, txt):
-            global current_users, ev_u
-            current_users = val
-            ev_u = txt
-            document.getElementById('disp-user').innerText = f"{int(val):,}"
-            document.getElementById('ev-user').innerText = txt
-            calc()
-
-        def calc():
-            if current_users == 0: return
-            # SBCM Unit: 30M yen / 72k people
-            d = (current_budget / 30000000) / (current_users / 72000)
-            
-            el_val = document.getElementById('d-val')
-            el_res = document.getElementById('d-res')
-            box = document.getElementById('verdict-area')
-            box.style.display = 'block'
-            
-            el_val.innerText = f"{d:.1f}"
-            
-            if d > 10:
-                el_res.innerText = "🚨 SCAM"
-                box.className = "verdict-box scam"
-            else:
-                el_res.innerText = "✅ SAFE"
-                box.className = "verdict-box safe"
-
-        def export_report(e):
-            if current_budget == 0: return
-            fname = document.getElementById('doc-name').value
-            d_val = document.getElementById('d-val').innerText
-            verdict = document.getElementById('d-res').innerText
-            
-            md = f"""# 🏛️ SBCM Audit Report
-**Target:** {fname}
-**Date:** {datetime.now().strftime("%Y-%m-%d")}
-
----
-## 📊 Result
-*   **Verdict:** {verdict}
-*   **D_Index:** {d_val}
-
-## 🔍 Evidence
-*   **Budget:** ¥{int(current_budget):,} (Src: "{ev_b}")
-*   **Beneficiaries:** {int(current_users):,} (Src: "{ev_u}")
----
-*Generated by Pithos Smart Auditor*
-"""
-            js.downloadFile(f"Audit_{fname}.md", md)
-
-        js.window.py_process_smart = create_proxy(process_smart)
-        js.window.set_budget = create_proxy(set_budget_py)
-        js.window.set_user = create_proxy(set_user_py)
+        // Init
+        updatePrompt();
     </script>
 </body>
 </html>
