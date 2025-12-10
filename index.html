@@ -8,8 +8,10 @@
     <!-- Libraries -->
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <!-- PDF.js (v3.11) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -20,21 +22,24 @@
 
         header { padding: 10px 20px; border-bottom: var(--border); display: flex; justify-content: space-between; align-items: center; background: #000; z-index: 10; }
         h1 { margin: 0; font-size: 1.2rem; }
+        
+        /* SYSTEM STATUS */
+        .sys-stat { font-size: 0.7rem; color: #666; display: flex; align-items: center; gap: 5px; }
+        .dot { width: 8px; height: 8px; background: #333; border-radius: 50%; }
+        .dot.ready { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
 
         #workspace { flex: 1; display: flex; overflow: hidden; position: relative; }
 
-        /* --- SECURE DOC VIEWER --- */
+        /* VIEWER */
         #doc-view { 
             flex: 1; padding: 20px; overflow-y: auto; border-right: var(--border); 
-            font-size: 0.8rem; line-height: 1.8; color: #888; 
-            white-space: pre-wrap;
-            /* COPY PROTECTION */
+            font-size: 0.8rem; line-height: 1.8; color: #888; white-space: pre-wrap;
             user-select: none; -webkit-user-select: none;
             background: radial-gradient(#111 15%, transparent 16%) 0 0, radial-gradient(#111 15%, transparent 16%) 8px 8px;
             background-color: #000; background-size: 16px 16px;
         }
 
-        /* --- AUDIT PANEL --- */
+        /* CONTROLS */
         #audit-panel { width: 350px; background: #0a0a0a; display: flex; flex-direction: column; border-left: var(--border); }
         .panel-content { flex: 1; padding: 20px; overflow-y: auto; }
         
@@ -42,14 +47,12 @@
         .label { font-size: 0.7rem; color: #888; display: block; margin-bottom: 5px; }
         .val-display { font-size: 1.2rem; font-weight: bold; color: #fff; border-bottom: 1px solid #444; padding-bottom: 5px; }
         
-        /* HIGHLIGHTS */
+        /* HIGHLIGHTS & REDACTION */
         .hl-money { color: #ffd700; cursor: pointer; text-decoration: underline; font-weight: bold; }
         .hl-money:hover { background: #ffd700; color: #000; }
         .hl-user { color: #00ffff; cursor: pointer; text-decoration: underline; font-weight: bold; }
         .hl-user:hover { background: #00ffff; color: #000; }
-        
-        /* REDACTED TEXT STYLE */
-        .redacted { color: #333; background: #111; letter-spacing: -2px; }
+        .redacted { color: #222; background: #111; letter-spacing: -3px; word-break: break-all; }
 
         /* VERDICT */
         .verdict-box { text-align: center; padding: 10px; margin-top: 10px; border: 1px solid #333; }
@@ -66,9 +69,11 @@
             flex-direction: column; align-items: center; justify-content: center;
         }
         .btn-upload {
-            background: var(--accent); color: #000; border: none; padding: 15px 30px;
-            font-weight: bold; font-size: 1.2rem; cursor: pointer; border-radius: 4px; margin-top: 20px;
+            background: #333; color: #888; border: 1px solid #666; padding: 15px 30px;
+            font-weight: bold; font-size: 1.2rem; cursor: not-allowed; border-radius: 4px; margin-top: 20px; transition: 0.3s;
         }
+        .btn-upload.active { background: var(--accent); color: #000; border-color: var(--accent); cursor: pointer; }
+        
         #loading { display: none; color: var(--accent); position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index: 30; text-align: center;}
 
         @media (max-width: 768px) {
@@ -78,105 +83,101 @@
         }
     </style>
 </head>
-<body oncontextmenu="return false;"> <!-- Disable Right Click -->
+<body oncontextmenu="return false;">
 
     <header>
         <div style="display:flex; align-items:center; gap:10px;">
             <i class="fas fa-shield-alt" style="color:var(--accent);"></i>
             <h1>SECURE AUDITOR</h1>
         </div>
-        <div style="font-size:0.6rem; color:#666; border:1px solid #333; padding:2px 5px;">NO-LOG POLICY</div>
+        <div class="sys-stat">
+            <span id="stat-text">BOOTING...</span>
+            <div id="stat-dot" class="dot"></div>
+        </div>
     </header>
 
     <div id="workspace">
-        <!-- VIEWER (Redacted) -->
+        <!-- VIEWER -->
         <div id="doc-view">
             <div style="text-align:center; color:#444; margin-top:50px;">
-                // SECURE DOCUMENT VIEWER //<br>
-                Non-audit data will be redacted.
+                // SECURE VIEWER //<br>
+                Data is processed locally (Client-side).
             </div>
         </div>
 
-        <!-- CONTROLS -->
+        <!-- PANEL -->
         <div id="audit-panel">
             <div class="panel-content">
                 <div class="card">
-                    <span class="label">FILE (ローカル解析中)</span>
-                    <input type="text" id="doc-name" placeholder="..." disabled style="width:100%; background:transparent; border:none; color:#888;">
+                    <span class="label">TARGET FILE (対象ファイル)</span>
+                    <input type="text" id="doc-name" placeholder="Waiting for file..." disabled style="width:100%; background:transparent; border:none; color:#888;">
                 </div>
 
                 <div class="card" style="border-color: #ffd700;">
                     <span class="label">1. BUDGET (予算)</span>
                     <div id="disp-budget" class="val-display">0</div>
-                    <div style="font-size:0.7rem; color:#ffd700; margin-top:5px;">
-                        [TAP YELLOW NUMBERS]
-                    </div>
+                    <div style="font-size:0.7rem; color:#ffd700; margin-top:5px;">[TAP YELLOW TEXT]</div>
                 </div>
 
                 <div class="card" style="border-color: #00ffff;">
                     <span class="label">2. USERS (人数)</span>
                     <div id="disp-user" class="val-display">0</div>
-                    <div style="font-size:0.7rem; color:#00ffff; margin-top:5px;">
-                        [TAP BLUE NUMBERS]
-                    </div>
+                    <div style="font-size:0.7rem; color:#00ffff; margin-top:5px;">[TAP BLUE TEXT]</div>
                 </div>
 
                 <div id="verdict-area" class="verdict-box" style="display:none;">
-                    <div style="font-size:0.7rem;">D_INDEX (歪み指数)</div>
+                    <div style="font-size:0.7rem;">D_INDEX</div>
                     <div id="d-val" style="font-size:2.5rem; font-weight:bold;">0.0</div>
                     <div id="d-res">---</div>
                 </div>
             </div>
             
             <div style="padding:20px; border-top:var(--border);">
-                <button class="btn-action" py-click="export_md"><i class="fas fa-download"></i> REPORT (.MD)</button>
-                <button class="btn-action" style="background:#000; color:#888; border-color:#444;" onclick="location.reload()">CLOSE</button>
+                <button class="btn-action" py-click="export_md"><i class="fas fa-download"></i> EXPORT</button>
+                <button class="btn-action" style="background:#000; color:#888; border-color:#444;" onclick="location.reload()">RESET</button>
             </div>
         </div>
 
-        <!-- UPLOAD UI -->
+        <!-- UPLOAD OVERLAY -->
         <div id="drop-overlay">
             <i class="fas fa-file-shield" style="font-size:4rem; color:#666;"></i>
-            <h2 style="margin-top:20px; color:#ccc;">SECURE DROP ZONE</h2>
-            <p style="color:#666; font-size:0.8rem;">PDF Only. Processed Locally.</p>
-            <button class="btn-upload" onclick="document.getElementById('file-in').click()">📂 OPEN FILE</button>
+            <h2 style="margin-top:20px; color:#ccc;">DROP PDF</h2>
+            <button id="btn-select" class="btn-upload" disabled onclick="document.getElementById('file-in').click()">INITIALIZING...</button>
             <input type="file" id="file-in" style="display:none;" accept="application/pdf">
         </div>
         
-        <div id="loading">
-            <i class="fas fa-cog fa-spin" style="font-size:2rem;"></i><br><br>
-            REDACTING & PARSING...
-        </div>
+        <div id="loading"><i class="fas fa-cog fa-spin" style="font-size:2rem;"></i><br><br>PARSING...</div>
     </div>
 
     <!-- JS -->
     <script>
-        const overlay = document.getElementById('drop-overlay');
+        // File Handling
         const fileIn = document.getElementById('file-in');
-
-        // Drag & Drop
-        window.ondragover = (e) => e.preventDefault();
-        window.ondrop = (e) => { e.preventDefault(); if (e.dataTransfer.files[0]) loadPDF(e.dataTransfer.files[0]); };
         fileIn.onchange = (e) => { if (e.target.files[0]) loadPDF(e.target.files[0]); };
 
         async function loadPDF(file) {
             document.getElementById('doc-name').value = file.name;
-            overlay.style.display = 'none';
+            document.getElementById('drop-overlay').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
 
             try {
                 const buffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument(buffer).promise;
                 let text = "";
-                const max = Math.min(pdf.numPages, 20); // Limit
+                const max = Math.min(pdf.numPages, 30); // 30 pages limit for speed
                 
                 for (let i = 1; i <= max; i++) {
                     const page = await pdf.getPage(i);
                     const content = await page.getTextContent();
+                    // Basic text extraction
                     text += content.items.map(item => item.str).join("") + "\n";
                 }
                 
-                window.py_process_secure(text); // Call Python
+                if (window.py_process_secure) {
+                    window.py_process_secure(text);
+                } else {
+                    throw new Error("System not ready");
+                }
 
             } catch (e) {
                 alert("Error: " + e); location.reload();
@@ -189,61 +190,70 @@
             const a = document.createElement('a');
             a.href = url; a.download = filename; a.click();
         }
+
+        // Enable UI when Python is ready (Called from Python)
+        function systemReady() {
+            document.getElementById('stat-text').innerText = "SYSTEM READY";
+            document.getElementById('stat-text').style.color = "#00ff41";
+            document.getElementById('stat-dot').classList.add('ready');
+            
+            const btn = document.getElementById('btn-select');
+            btn.disabled = false;
+            btn.innerText = "📂 OPEN FILE";
+            btn.classList.add('active');
+        }
     </script>
 
-    <!-- PYTHON LOGIC -->
+    <!-- PYTHON -->
     <script type="py">
         from pyscript import document
         from pyodide.ffi import create_proxy
         import js, re
         
-        # State
         current_budget = 0
         current_users = 0
+
+        # Pre-compile regex for speed
+        re_money = re.compile(r'([0-9,]+(兆|億|万|千)?円)')
+        re_ppl = re.compile(r'([0-9,]+(人|名|世帯))')
 
         def process_secure(raw_text):
             lines = raw_text.split('\n')
             safe_html = ""
             
-            # Anti-Piracy Filters
-            money_pattern = r'([0-9,]+(兆|億|万|千)?円)'
-            ppl_pattern = r'([0-9,]+(人|名|世帯))'
-            
+            # Helper: Replacers
+            def repl_m(m):
+                val = parse_jp_money(m.group(0))
+                if val < 1000000: return m.group(0) # Ignore small cash
+                return f'<span class="hl-money" onclick="window.set_budget({val})">{m.group(0)}</span>'
+
+            def repl_p(m):
+                val = parse_num(m.group(0))
+                return f'<span class="hl-user" onclick="window.set_user({val})">{m.group(0)}</span>'
+
+            # Line Processing
             for line in lines:
                 line = line.strip()
                 if not line: continue
                 
-                has_money = re.search(money_pattern, line)
-                has_ppl = re.search(ppl_pattern, line)
+                # Check keywords
+                has_m = re_money.search(line)
+                has_p = re_ppl.search(line)
                 
-                if has_money or has_ppl:
-                    # KEEP LINE (Audit Target)
-                    # Inject clickable spans
+                if has_m or has_p:
+                    # Inject spans
                     processed = line
-                    
-                    def repl_m(m):
-                        val = parse_jp_money(m.group(0))
-                        if val < 1000000: return m.group(0)
-                        return f'<span class="hl-money" onclick="window.set_budget({val})">{m.group(0)}</span>'
-                    
-                    def repl_p(m):
-                        val = parse_num(m.group(0))
-                        return f'<span class="hl-user" onclick="window.set_user({val})">{m.group(0)}</span>'
-                    
-                    processed = re.sub(money_pattern, repl_m, processed)
-                    processed = re.sub(ppl_pattern, repl_p, processed)
-                    
+                    processed = re_money.sub(repl_m, processed)
+                    processed = re_ppl.sub(repl_p, processed)
                     safe_html += f"<div>{processed}</div>"
                 else:
-                    # REDACT LINE (Noise/Copyright Content)
-                    # Replace with block characters
-                    redacted = "░" * min(len(line), 50)
-                    safe_html += f"<div class='redacted'>{redacted}</div>"
+                    # Redact
+                    mask = "░" * min(len(line), 60)
+                    safe_html += f"<div class='redacted'>{mask}</div>"
 
             document.getElementById('doc-view').innerHTML = safe_html
             document.getElementById('loading').style.display = 'none'
 
-        # Parsing Helpers
         def parse_jp_money(s):
             s = s.replace(",","").replace("円","")
             unit = 1
@@ -258,7 +268,7 @@
             try: return float(s)
             except: return 0
 
-        # Click Handlers
+        # UI handlers
         def set_budget_py(val):
             global current_budget
             current_budget = val
@@ -292,13 +302,16 @@
         def export_md(e):
             fname = document.getElementById('doc-name').value
             d_val = document.getElementById('d-val').innerText
-            md = f"# SBCM Audit: {fname}\n\n*   Budget: ¥{int(current_budget):,}\n*   Users: {int(current_users):,}\n*   D_Index: {d_val}\n\nGenerated by Pithos OS"
+            md = f"# Audit: {fname}\n* Budget: {int(current_budget):,}\n* Users: {int(current_users):,}\n* D_Index: {d_val}\n\n(Generated by Pithos)"
             js.downloadFile(f"Audit_{d_val}.md", md)
 
+        # Expose
         js.window.py_process_secure = create_proxy(process_secure)
         js.window.set_budget = create_proxy(set_budget_py)
         js.window.set_user = create_proxy(set_user_py)
-
+        
+        # Signal Ready
+        js.systemReady()
     </script>
 </body>
 </html>
